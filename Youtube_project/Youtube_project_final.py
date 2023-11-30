@@ -1,8 +1,10 @@
 from collections import OrderedDict
+
+import mysql.connector
 import pandas as pd
 import streamlit as st
 from streamlit_option_menu import option_menu
-# import mysql.connector as sql
+import mysql.connector as sql
 import pymongo as pm
 from googleapiclient.discovery import build
 import sqlalchemy as sa
@@ -322,6 +324,7 @@ if selected == "Youtube Data transformation":
                 connection_string = ('mysql+pymysql://root:Suresh%401986@localhost/project')
                 engine = sa.create_engine(connection_string)
                 engine.connect()
+
                 # print(vi_details[vi_details["Video_id"]=='oNOJfOBzAxM'])
                 query = "select Channel_Name from Channel where Channel_Name='" + channel_name + "'"
                 ch_dbdetails = pd.read_sql(query, engine)
@@ -335,13 +338,56 @@ if selected == "Youtube Data transformation":
                     query2 = "select vi.Video_id from video vi " \
                              "where Vi.playlist_id=(select playlist_id from channel where Channel_Name ='" + channel_name + "' )"
                     Vi_dbdetails = pd.read_sql(query2, engine)
+                    vi_l = []
+                    for i in Vi_dbdetails['Video_id']:
+                        vi_l.append(i)
                     vi_details1 = sqldf(
                         """select * from vi_details where Video_id not in (select Video_id from Vi_dbdetails)""")
-                    print(vi_details1)
-                    vi_details1.to_sql('video', if_exists='append', con=engine, index=False)
+                    delete_cmd_co = "delete from comment where video_id in ('" + ("','".join(vi_l)) + "')"
+                    delete_cmd_vi = "Delete from video vi where Vi.playlist_id=(select playlist_id from channel where Channel_Name ='" + channel_name + "' )"
+                    if (len(vi_l) >= 1):
+                        conn = mysql.connector.Connect(host='localhost', username='root', password='Suresh@1986',
+                                                       database='project')
+                        cursor = conn.cursor()
+                        cursor.execute(delete_cmd_co)
+                        conn.commit()
+                        conn.close()
+                    try:
+                        conn = mysql.connector.Connect(host='localhost', username='root', password='Suresh@1986',
+                                                       database='project')
+                        cursor = conn.cursor()
+                        cursor.execute(delete_cmd_vi)
+                        conn.commit()
+                        conn.close()
+                    except mysql.connector.errors.InternalError as ie:
+                        pass
+                    try:
+                        conn = mysql.connector.Connect(host='localhost', username='root', password='Suresh@1986',
+                                                       database='project')
+                        delete_cmd_pl = "Delete from playlist where playlist_id=(select playlist_id from channel where Channel_Name ='" + channel_name + "' )"
+                        cursor = conn.cursor()
+                        cursor.execute(delete_cmd_pl)
+                        conn.commit()
+                        conn.close()
+                    except mysql.connector.errors.InternalError as ie:
+                        pass
+                    try:
+                        conn = mysql.connector.Connect(host='localhost', username='root', password='Suresh@1986',
+                                                       database='project')
+                        delete_cmd_ch = "delete from channel where Channel_Name ='" + channel_name + "' "
+                        cursor = conn.cursor()
+                        cursor.execute(delete_cmd_ch)
+                        conn.commit()
+                        conn.close()
+                    except mysql.connector.errors.InternalError as ie:
+                        pass
+                    # vi_details1.to_sql('video', if_exists='append', con=engine, index=False)
+                    ch_details.to_sql('channel', if_exists='append', con=engine, index=False)
+                    pl_details.to_sql('playlist', if_exists='append', con=engine, index=False)
+                    vi_details.to_sql('video', if_exists='append', con=engine, index=False)
                     co_details1 = sqldf(
                         """select * from co_details where Video_id not  in (select Video_id from Vi_dbdetails)""")
-                    co_details1.to_sql('comment', if_exists='append', con=engine, index=False)
+                    co_details.to_sql('comment', if_exists='append', con=engine, index=False)
 
             transform(option)
 
